@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -22,11 +21,8 @@ func NewAuthHandler(service *services.AuthService) AuthHandler {
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	var registration model.Registration
-	err := json.NewDecoder(r.Body).Decode(&registration)
-
-	if err != nil {
-		apierr.MalformedRequestBody().RespondTo(w)
+	registration, ok := decodeAndValidate[model.Registration](w, r)
+	if !ok {
 		return
 	}
 
@@ -41,15 +37,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	buffer, err := json.Marshal(token)
-	if err != nil {
-		apierr.UnexpectedServerError().RespondTo(w)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	w.Write(buffer)
+	respondJSON(w, http.StatusCreated, token)
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -69,15 +57,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	buf, err := json.Marshal(token)
-	if err != nil {
-		apierr.UnexpectedServerError().RespondTo(w)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	w.Write(buf)
+	respondJSON(w, http.StatusCreated, token)
 }
 
 func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
@@ -87,9 +67,8 @@ func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body model.UpdatePassword
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		apierr.MalformedRequestBody().RespondTo(w)
+	body, ok := decodeAndValidate[model.UpdatePassword](w, r)
+	if !ok {
 		return
 	}
 

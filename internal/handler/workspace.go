@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"getkanbam.app/api/internal/middleware"
@@ -36,8 +35,8 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var req model.WorkspaceCreation
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.WorkspaceCreation](w, r)
+	if !ok {
 		return
 	}
 	ws, err := h.workspaces.CreateWorkspace(r.Context(), userID, req)
@@ -60,8 +59,8 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "workspaceID")
-	var req model.WorkspaceUpdate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.WorkspaceUpdate](w, r)
+	if !ok {
 		return
 	}
 	ws, err := h.workspaces.UpdateWorkspace(r.Context(), id, req)
@@ -95,8 +94,8 @@ func (h *WorkspaceHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "workspaceID")
-	var req model.Membership
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.Membership](w, r)
+	if !ok {
 		return
 	}
 	if err := h.workspaces.AddMember(r.Context(), id, req); err != nil {
@@ -120,8 +119,8 @@ func (h *WorkspaceHandler) GetMember(w http.ResponseWriter, r *http.Request) {
 func (h *WorkspaceHandler) UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
 	wsID := chi.URLParam(r, "workspaceID")
 	uID := chi.URLParam(r, "userID")
-	var req model.MembershipUpdate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.MembershipUpdate](w, r)
+	if !ok {
 		return
 	}
 	if err := h.workspaces.UpdateMemberRole(r.Context(), wsID, uID, req); err != nil {
@@ -155,8 +154,8 @@ func (h *WorkspaceHandler) ListTags(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) CreateTag(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "workspaceID")
-	var req model.TagCreation
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.TagCreation](w, r)
+	if !ok {
 		return
 	}
 	tag, err := h.workspaces.CreateTag(r.Context(), id, req)

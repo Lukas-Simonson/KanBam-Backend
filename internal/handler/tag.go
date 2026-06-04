@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"getkanbam.app/api/internal/model"
@@ -29,8 +28,8 @@ func (h *TagHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *TagHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "tagID")
-	var req model.TagUpdate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.TagUpdate](w, r)
+	if !ok {
 		return
 	}
 	tag, err := h.tags.UpdateTag(r.Context(), id, req)

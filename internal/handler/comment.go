@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"getkanbam.app/api/internal/model"
@@ -29,8 +28,8 @@ func (h *CommentHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "commentID")
-	var req model.CommentUpdate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.CommentUpdate](w, r)
+	if !ok {
 		return
 	}
 	comment, err := h.comments.UpdateComment(r.Context(), id, req)
