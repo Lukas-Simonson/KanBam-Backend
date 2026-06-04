@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"getkanbam.app/api/internal/middleware"
@@ -32,8 +31,8 @@ func (h *CardHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *CardHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "cardID")
-	var req model.CardUpdate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.CardUpdate](w, r)
+	if !ok {
 		return
 	}
 	card, err := h.cards.UpdateCard(r.Context(), id, req)
@@ -71,8 +70,8 @@ func (h *CardHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var req model.CommentCreation
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.CommentCreation](w, r)
+	if !ok {
 		return
 	}
 	comment, err := h.comments.CreateComment(r.Context(), cardID, userID, req)

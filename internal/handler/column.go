@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"getkanbam.app/api/internal/model"
@@ -29,8 +28,8 @@ func (h *ColumnHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *ColumnHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "columnID")
-	var req model.ColumnUpdate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.ColumnUpdate](w, r)
+	if !ok {
 		return
 	}
 	col, err := h.columns.UpdateColumn(r.Context(), id, req)

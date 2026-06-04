@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"getkanbam.app/api/internal/model"
@@ -31,8 +30,8 @@ func (h *BoardHandler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) Create(w http.ResponseWriter, r *http.Request) {
 	wsID := chi.URLParam(r, "workspaceID")
-	var req model.BoardCreation
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.BoardCreation](w, r)
+	if !ok {
 		return
 	}
 	board, err := h.boards.CreateBoard(r.Context(), wsID, req)
@@ -55,8 +54,8 @@ func (h *BoardHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "boardID")
-	var req model.BoardUpdate
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.BoardUpdate](w, r)
+	if !ok {
 		return
 	}
 	board, err := h.boards.UpdateBoard(r.Context(), id, req)
@@ -90,8 +89,8 @@ func (h *BoardHandler) ListColumns(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) CreateColumn(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "boardID")
-	var req model.ColumnCreation
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.ColumnCreation](w, r)
+	if !ok {
 		return
 	}
 	col, err := h.columns.CreateColumn(r.Context(), id, req)
@@ -118,9 +117,6 @@ func (h *BoardHandler) CreateCard(w http.ResponseWriter, r *http.Request) {
 	bID := chi.URLParam(r, "boardID")
 	wsID := chi.URLParam(r, "workspaceID")
 
-	// workspaceID is not in this route's URL params — fetch it from the board.
-	// For simplicity we require callers to pass it as a query param, or we look it up.
-	// Since we have the board service available, look it up.
 	board, err := h.boards.GetBoard(r.Context(), bID)
 	if err != nil {
 		handleError(w, err)
@@ -130,13 +126,11 @@ func (h *BoardHandler) CreateCard(w http.ResponseWriter, r *http.Request) {
 		wsID = board.WorkspaceID
 	}
 
-	var req model.CardCreation
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	req, ok := decodeAndValidate[model.CardCreation](w, r)
+	if !ok {
 		return
 	}
 
-	// userID is the authenticated user — passed as empty string here;
-	// assignee comes from the request body (req.UserID).
 	card, err := h.cards.CreateCard(r.Context(), bID, wsID, "", req)
 	if err != nil {
 		handleError(w, err)

@@ -150,6 +150,14 @@ func MalformedRequestBody() APIError {
 	}
 }
 
+func InvalidRequest(reason string) APIError {
+	return APIError{
+		Status: 400,
+		Code:   "INVALID_REQUEST",
+		Reason: reason,
+	}
+}
+
 func UnexpectedServerError() APIError {
 	return APIError{
 		Status: 500,
