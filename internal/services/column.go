@@ -20,7 +20,7 @@ func NewColumnService(q *db.Queries) ColumnService {
 	return ColumnService{db: q}
 }
 
-func (s *ColumnService) GetColumn(ctx context.Context, columnID string) (model.Column, error) {
+func (s *ColumnService) GetColumn(ctx context.Context, callerID, columnID string) (model.Column, error) {
 	id, err := convert.ParseUUID(columnID)
 	if err != nil {
 		return model.Column{}, fmt.Errorf("parsing column id: %w", err)
@@ -32,14 +32,31 @@ func (s *ColumnService) GetColumn(ctx context.Context, columnID string) (model.C
 		}
 		return model.Column{}, fmt.Errorf("getting column: %w", err)
 	}
+	board, err := s.db.GetBoardByID(ctx, col.BoardID)
+	if err != nil {
+		return model.Column{}, fmt.Errorf("getting board for column: %w", err)
+	}
+	if err := requireRole(ctx, s.db, board.WorkspaceID, callerID, db.RoleViewer); err != nil {
+		return model.Column{}, err
+	}
 	return columnToModel(col), nil
 }
 
 // ListColumnsWithCards returns all columns in a board, each populated with its cards.
-func (s *ColumnService) ListColumnsWithCards(ctx context.Context, boardID string) ([]model.ColumnWithCards, error) {
+func (s *ColumnService) ListColumnsWithCards(ctx context.Context, callerID, boardID string) ([]model.ColumnWithCards, error) {
 	bID, err := convert.ParseUUID(boardID)
 	if err != nil {
 		return nil, fmt.Errorf("parsing board id: %w", err)
+	}
+	board, err := s.db.GetBoardByID(ctx, bID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apierr.BoardNotFound()
+		}
+		return nil, fmt.Errorf("getting board: %w", err)
+	}
+	if err := requireRole(ctx, s.db, board.WorkspaceID, callerID, db.RoleViewer); err != nil {
+		return nil, err
 	}
 	cols, err := s.db.GetColumnsByBoard(ctx, bID)
 	if err != nil {
@@ -66,10 +83,20 @@ func (s *ColumnService) ListColumnsWithCards(ctx context.Context, boardID string
 	return result, nil
 }
 
-func (s *ColumnService) CreateColumn(ctx context.Context, boardID string, req model.ColumnCreation) (model.Column, error) {
+func (s *ColumnService) CreateColumn(ctx context.Context, callerID, boardID string, req model.ColumnCreation) (model.Column, error) {
 	bID, err := convert.ParseUUID(boardID)
 	if err != nil {
 		return model.Column{}, fmt.Errorf("parsing board id: %w", err)
+	}
+	board, err := s.db.GetBoardByID(ctx, bID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.Column{}, apierr.BoardNotFound()
+		}
+		return model.Column{}, fmt.Errorf("getting board: %w", err)
+	}
+	if err := requireRole(ctx, s.db, board.WorkspaceID, callerID, db.RoleContributer); err != nil {
+		return model.Column{}, err
 	}
 	col, err := s.db.CreateColumn(ctx, db.CreateColumnParams{
 		ID:         convert.NewUUID(),
@@ -86,7 +113,7 @@ func (s *ColumnService) CreateColumn(ctx context.Context, boardID string, req mo
 	return columnToModel(col), nil
 }
 
-func (s *ColumnService) UpdateColumn(ctx context.Context, columnID string, req model.ColumnUpdate) (model.Column, error) {
+func (s *ColumnService) UpdateColumn(ctx context.Context, callerID, columnID string, req model.ColumnUpdate) (model.Column, error) {
 	id, err := convert.ParseUUID(columnID)
 	if err != nil {
 		return model.Column{}, fmt.Errorf("parsing column id: %w", err)
@@ -97,6 +124,13 @@ func (s *ColumnService) UpdateColumn(ctx context.Context, columnID string, req m
 			return model.Column{}, apierr.ColumnNotFound()
 		}
 		return model.Column{}, fmt.Errorf("getting column: %w", err)
+	}
+	board, err := s.db.GetBoardByID(ctx, current.BoardID)
+	if err != nil {
+		return model.Column{}, fmt.Errorf("getting board for column: %w", err)
+	}
+	if err := requireRole(ctx, s.db, board.WorkspaceID, callerID, db.RoleAdmin); err != nil {
+		return model.Column{}, err
 	}
 
 	title := current.Title
@@ -115,7 +149,6 @@ func (s *ColumnService) UpdateColumn(ctx context.Context, columnID string, req m
 	if req.Position != nil {
 		position = *req.Position
 	}
-	// Color: use provided value; nil keeps the current color via COALESCE.
 	var color interface{} = current.Color
 	if req.Color != nil {
 		color = *req.Color
@@ -135,10 +168,24 @@ func (s *ColumnService) UpdateColumn(ctx context.Context, columnID string, req m
 	return columnToModel(col), nil
 }
 
-func (s *ColumnService) DeleteColumn(ctx context.Context, columnID string) error {
+func (s *ColumnService) DeleteColumn(ctx context.Context, callerID, columnID string) error {
 	id, err := convert.ParseUUID(columnID)
 	if err != nil {
 		return fmt.Errorf("parsing column id: %w", err)
+	}
+	col, err := s.db.GetColumnByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apierr.ColumnNotFound()
+		}
+		return fmt.Errorf("getting column: %w", err)
+	}
+	board, err := s.db.GetBoardByID(ctx, col.BoardID)
+	if err != nil {
+		return fmt.Errorf("getting board for column: %w", err)
+	}
+	if err := requireRole(ctx, s.db, board.WorkspaceID, callerID, db.RoleAdmin); err != nil {
+		return err
 	}
 	if err := s.db.DeleteColumn(ctx, id); err != nil {
 		return fmt.Errorf("deleting column: %w", err)

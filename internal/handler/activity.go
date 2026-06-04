@@ -17,7 +17,11 @@ func NewActivityHandler(a *services.ActivityService) ActivityHandler {
 
 func (h *ActivityHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "activityID")
-	activity, err := h.activity.GetActivity(r.Context(), id)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	activity, err := h.activity.GetActivity(r.Context(), callerID, id)
 	if err != nil {
 		handleError(w, err)
 		return

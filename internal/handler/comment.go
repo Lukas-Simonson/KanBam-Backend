@@ -18,7 +18,11 @@ func NewCommentHandler(c *services.CommentService) CommentHandler {
 
 func (h *CommentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "commentID")
-	comment, err := h.comments.GetComment(r.Context(), id)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	comment, err := h.comments.GetComment(r.Context(), callerID, id)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -28,11 +32,15 @@ func (h *CommentHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "commentID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	req, ok := decodeAndValidate[model.CommentUpdate](w, r)
 	if !ok {
 		return
 	}
-	comment, err := h.comments.UpdateComment(r.Context(), id, req)
+	comment, err := h.comments.UpdateComment(r.Context(), callerID, id, req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -42,7 +50,11 @@ func (h *CommentHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "commentID")
-	if err := h.comments.DeleteComment(r.Context(), id); err != nil {
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.comments.DeleteComment(r.Context(), callerID, id); err != nil {
 		handleError(w, err)
 		return
 	}

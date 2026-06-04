@@ -20,10 +20,20 @@ func NewCardService(q *db.Queries) CardService {
 	return CardService{db: q}
 }
 
-func (s *CardService) ListCardsWithTags(ctx context.Context, boardID string) ([]model.CardWithTags, error) {
+func (s *CardService) ListCardsWithTags(ctx context.Context, callerID, boardID string) ([]model.CardWithTags, error) {
 	bID, err := convert.ParseUUID(boardID)
 	if err != nil {
 		return nil, fmt.Errorf("parsing board id: %w", err)
+	}
+	board, err := s.db.GetBoardByID(ctx, bID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apierr.BoardNotFound()
+		}
+		return nil, fmt.Errorf("getting board: %w", err)
+	}
+	if err := requireRole(ctx, s.db, board.WorkspaceID, callerID, db.RoleViewer); err != nil {
+		return nil, err
 	}
 	cards, err := s.db.GetCardsByBoard(ctx, bID)
 	if err != nil {
@@ -40,7 +50,7 @@ func (s *CardService) ListCardsWithTags(ctx context.Context, boardID string) ([]
 	return result, nil
 }
 
-func (s *CardService) GetCardWithTags(ctx context.Context, cardID string) (model.CardWithTags, error) {
+func (s *CardService) GetCardWithTags(ctx context.Context, callerID, cardID string) (model.CardWithTags, error) {
 	id, err := convert.ParseUUID(cardID)
 	if err != nil {
 		return model.CardWithTags{}, fmt.Errorf("parsing card id: %w", err)
@@ -52,6 +62,9 @@ func (s *CardService) GetCardWithTags(ctx context.Context, cardID string) (model
 		}
 		return model.CardWithTags{}, fmt.Errorf("getting card: %w", err)
 	}
+	if err := requireRole(ctx, s.db, c.WorkspaceID, callerID, db.RoleViewer); err != nil {
+		return model.CardWithTags{}, err
+	}
 	tags, err := s.db.GetCardTags(ctx, id)
 	if err != nil {
 		return model.CardWithTags{}, fmt.Errorf("getting card tags: %w", err)
@@ -61,7 +74,7 @@ func (s *CardService) GetCardWithTags(ctx context.Context, cardID string) (model
 
 // CreateCard creates a card, increments the board sequence for the reference,
 // and attaches any provided tag IDs.
-func (s *CardService) CreateCard(ctx context.Context, boardID, workspaceID, userID string, req model.CardCreation) (model.CardWithTags, error) {
+func (s *CardService) CreateCard(ctx context.Context, callerID, boardID, workspaceID string, req model.CardCreation) (model.CardWithTags, error) {
 	bID, err := convert.ParseUUID(boardID)
 	if err != nil {
 		return model.CardWithTags{}, fmt.Errorf("parsing board id: %w", err)
@@ -70,8 +83,10 @@ func (s *CardService) CreateCard(ctx context.Context, boardID, workspaceID, user
 	if err != nil {
 		return model.CardWithTags{}, fmt.Errorf("parsing workspace id: %w", err)
 	}
+	if err := requireRole(ctx, s.db, wsID, callerID, db.RoleContributer); err != nil {
+		return model.CardWithTags{}, err
+	}
 
-	// Fetch board to build the reference (e.g. #PROJ-42).
 	board, err := s.db.GetBoardByID(ctx, bID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -103,7 +118,6 @@ func (s *CardService) CreateCard(ctx context.Context, boardID, workspaceID, user
 		return model.CardWithTags{}, fmt.Errorf("creating card: %w", err)
 	}
 
-	// Attach tags.
 	for _, tagIDStr := range req.TagIDs {
 		tagID, err := convert.ParseUUID(tagIDStr)
 		if err != nil {
@@ -129,7 +143,7 @@ func (s *CardService) CreateCard(ctx context.Context, boardID, workspaceID, user
 // NOTE: Setting column_id or user_id to NULL (unassigning) is not supported
 // by the current COALESCE-based query. Add dedicated NullifyCardColumn /
 // NullifyCardAssignee queries if that behaviour is required.
-func (s *CardService) UpdateCard(ctx context.Context, cardID string, req model.CardUpdate) (model.CardWithTags, error) {
+func (s *CardService) UpdateCard(ctx context.Context, callerID, cardID string, req model.CardUpdate) (model.CardWithTags, error) {
 	id, err := convert.ParseUUID(cardID)
 	if err != nil {
 		return model.CardWithTags{}, fmt.Errorf("parsing card id: %w", err)
@@ -140,6 +154,9 @@ func (s *CardService) UpdateCard(ctx context.Context, cardID string, req model.C
 			return model.CardWithTags{}, apierr.CardNotFound()
 		}
 		return model.CardWithTags{}, fmt.Errorf("getting card: %w", err)
+	}
+	if err := requireRole(ctx, s.db, current.WorkspaceID, callerID, db.RoleContributer); err != nil {
+		return model.CardWithTags{}, err
 	}
 
 	title := current.Title
@@ -187,10 +204,20 @@ func (s *CardService) UpdateCard(ctx context.Context, cardID string, req model.C
 	return cardWithTagsToModel(card, tags), nil
 }
 
-func (s *CardService) DeleteCard(ctx context.Context, cardID string) error {
+func (s *CardService) DeleteCard(ctx context.Context, callerID, cardID string) error {
 	id, err := convert.ParseUUID(cardID)
 	if err != nil {
 		return fmt.Errorf("parsing card id: %w", err)
+	}
+	c, err := s.db.GetCardByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apierr.CardNotFound()
+		}
+		return fmt.Errorf("getting card: %w", err)
+	}
+	if err := requireRole(ctx, s.db, c.WorkspaceID, callerID, db.RoleContributer); err != nil {
+		return err
 	}
 	if err := s.db.DeleteCard(ctx, id); err != nil {
 		return fmt.Errorf("deleting card: %w", err)
@@ -198,10 +225,20 @@ func (s *CardService) DeleteCard(ctx context.Context, cardID string) error {
 	return nil
 }
 
-func (s *CardService) GetActivity(ctx context.Context, cardID string, filters ActivityFilters) ([]model.Activity, error) {
+func (s *CardService) GetActivity(ctx context.Context, callerID, cardID string, filters ActivityFilters) ([]model.Activity, error) {
 	id, err := convert.ParseUUID(cardID)
 	if err != nil {
 		return nil, fmt.Errorf("parsing card id: %w", err)
+	}
+	c, err := s.db.GetCardByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apierr.CardNotFound()
+		}
+		return nil, fmt.Errorf("getting card: %w", err)
+	}
+	if err := requireRole(ctx, s.db, c.WorkspaceID, callerID, db.RoleViewer); err != nil {
+		return nil, err
 	}
 	rows, err := s.db.GetCardActivity(ctx, db.GetCardActivityParams{
 		CardID:  id,

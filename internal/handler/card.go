@@ -21,7 +21,11 @@ func NewCardHandler(c *services.CardService, com *services.CommentService, b *se
 
 func (h *CardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "cardID")
-	card, err := h.cards.GetCardWithTags(r.Context(), id)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	card, err := h.cards.GetCardWithTags(r.Context(), callerID, id)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -31,11 +35,15 @@ func (h *CardHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *CardHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "cardID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	req, ok := decodeAndValidate[model.CardUpdate](w, r)
 	if !ok {
 		return
 	}
-	card, err := h.cards.UpdateCard(r.Context(), id, req)
+	card, err := h.cards.UpdateCard(r.Context(), callerID, id, req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -45,7 +53,11 @@ func (h *CardHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 func (h *CardHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "cardID")
-	if err := h.cards.DeleteCard(r.Context(), id); err != nil {
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.cards.DeleteCard(r.Context(), callerID, id); err != nil {
 		handleError(w, err)
 		return
 	}
@@ -56,7 +68,11 @@ func (h *CardHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *CardHandler) ListComments(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "cardID")
-	comments, err := h.comments.ListComments(r.Context(), id)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	comments, err := h.comments.ListComments(r.Context(), callerID, id)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -74,7 +90,7 @@ func (h *CardHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	comment, err := h.comments.CreateComment(r.Context(), cardID, userID, req)
+	comment, err := h.comments.CreateComment(r.Context(), userID, cardID, userID, req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -86,13 +102,17 @@ func (h *CardHandler) CreateComment(w http.ResponseWriter, r *http.Request) {
 
 func (h *CardHandler) GetActivity(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "cardID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	q := r.URL.Query()
 	filters := services.ActivityFilters{
 		UserID: parseQueryUUID(q.Get("userID")),
 		After:  parseQueryTime(q.Get("after")),
 		Before: parseQueryTime(q.Get("before")),
 	}
-	activities, err := h.cards.GetActivity(r.Context(), id, filters)
+	activities, err := h.cards.GetActivity(r.Context(), callerID, id, filters)
 	if err != nil {
 		handleError(w, err)
 		return

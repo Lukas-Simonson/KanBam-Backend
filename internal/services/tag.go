@@ -20,7 +20,7 @@ func NewTagService(q *db.Queries) TagService {
 	return TagService{db: q}
 }
 
-func (s *TagService) GetTag(ctx context.Context, tagID string) (model.Tag, error) {
+func (s *TagService) GetTag(ctx context.Context, callerID, tagID string) (model.Tag, error) {
 	id, err := convert.ParseUUID(tagID)
 	if err != nil {
 		return model.Tag{}, fmt.Errorf("parsing tag id: %w", err)
@@ -32,10 +32,13 @@ func (s *TagService) GetTag(ctx context.Context, tagID string) (model.Tag, error
 		}
 		return model.Tag{}, fmt.Errorf("getting tag: %w", err)
 	}
+	if err := requireRole(ctx, s.db, t.WorkspaceID, callerID, db.RoleViewer); err != nil {
+		return model.Tag{}, err
+	}
 	return tagToModel(t), nil
 }
 
-func (s *TagService) UpdateTag(ctx context.Context, tagID string, req model.TagUpdate) (model.Tag, error) {
+func (s *TagService) UpdateTag(ctx context.Context, callerID, tagID string, req model.TagUpdate) (model.Tag, error) {
 	id, err := convert.ParseUUID(tagID)
 	if err != nil {
 		return model.Tag{}, fmt.Errorf("parsing tag id: %w", err)
@@ -46,6 +49,9 @@ func (s *TagService) UpdateTag(ctx context.Context, tagID string, req model.TagU
 			return model.Tag{}, apierr.TagNotFound()
 		}
 		return model.Tag{}, fmt.Errorf("getting tag: %w", err)
+	}
+	if err := requireRole(ctx, s.db, current.WorkspaceID, callerID, db.RoleAdmin); err != nil {
+		return model.Tag{}, err
 	}
 
 	name := current.Name
@@ -71,10 +77,20 @@ func (s *TagService) UpdateTag(ctx context.Context, tagID string, req model.TagU
 	return tagToModel(t), nil
 }
 
-func (s *TagService) DeleteTag(ctx context.Context, tagID string) error {
+func (s *TagService) DeleteTag(ctx context.Context, callerID, tagID string) error {
 	id, err := convert.ParseUUID(tagID)
 	if err != nil {
 		return fmt.Errorf("parsing tag id: %w", err)
+	}
+	t, err := s.db.GetTagByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apierr.TagNotFound()
+		}
+		return fmt.Errorf("getting tag: %w", err)
+	}
+	if err := requireRole(ctx, s.db, t.WorkspaceID, callerID, db.RoleAdmin); err != nil {
+		return err
 	}
 	if err := s.db.DeleteTag(ctx, id); err != nil {
 		return fmt.Errorf("deleting tag: %w", err)

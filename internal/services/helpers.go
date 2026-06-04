@@ -1,11 +1,16 @@
 package services
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"strings"
 
+	"getkanbam.app/api/internal/apierr"
 	"getkanbam.app/api/internal/convert"
 	"getkanbam.app/api/internal/db"
 	"getkanbam.app/api/internal/model"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -21,6 +26,41 @@ type ActivityFilters struct {
 // isUniqueViolation checks if a Postgres error is a unique constraint violation.
 func isUniqueViolation(err error) bool {
 	return strings.Contains(err.Error(), "23505")
+}
+
+// roleAtLeast returns true when role meets or exceeds minRole in the hierarchy:
+// viewer < contributer < admin < owner.
+func roleAtLeast(role, minRole db.Role) bool {
+	order := map[db.Role]int{
+		db.RoleViewer:      0,
+		db.RoleContributer: 1,
+		db.RoleAdmin:       2,
+		db.RoleOwner:       3,
+	}
+	return order[role] >= order[minRole]
+}
+
+// requireRole verifies callerID is an active workspace member with at least minRole.
+// Returns NotAuthorized if the user is not a member, has a pending invite, or lacks the required role.
+func requireRole(ctx context.Context, q *db.Queries, workspaceID pgtype.UUID, callerID string, minRole db.Role) error {
+	uID, err := convert.ParseUUID(callerID)
+	if err != nil {
+		return apierr.NotAuthorized()
+	}
+	m, err := q.GetWorkspaceMembership(ctx, db.GetWorkspaceMembershipParams{
+		WorkspaceID: workspaceID,
+		UserID:      uID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apierr.NotAuthorized()
+		}
+		return fmt.Errorf("checking membership: %w", err)
+	}
+	if m.Pending || !roleAtLeast(m.Role, minRole) {
+		return apierr.NotAuthorized()
+	}
+	return nil
 }
 
 // tagToModel converts a db.Tag to model.Tag.

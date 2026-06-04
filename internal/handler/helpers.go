@@ -10,6 +10,7 @@ import (
 
 	"getkanbam.app/api/internal/apierr"
 	"getkanbam.app/api/internal/convert"
+	"getkanbam.app/api/internal/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -85,6 +86,16 @@ func handleError(w http.ResponseWriter, err error) {
 		return
 	}
 	apierr.UnexpectedServerError().RespondTo(w)
+}
+
+// mustCallerID extracts the authenticated user's ID from the request context.
+// It writes a 401 and returns false if the ID is missing (should not happen under JWTBearerMiddleware).
+func mustCallerID(w http.ResponseWriter, r *http.Request) (string, bool) {
+	id, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		apierr.InvalidAuth().RespondTo(w)
+	}
+	return id, ok
 }
 
 // urlUUID extracts a named URL parameter and parses it as a UUID.

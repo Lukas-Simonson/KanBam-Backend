@@ -20,7 +20,7 @@ func NewActivityService(q *db.Queries) ActivityService {
 	return ActivityService{db: q}
 }
 
-func (s *ActivityService) GetActivity(ctx context.Context, activityID string) (model.Activity, error) {
+func (s *ActivityService) GetActivity(ctx context.Context, callerID, activityID string) (model.Activity, error) {
 	id, err := convert.ParseUUID(activityID)
 	if err != nil {
 		return model.Activity{}, fmt.Errorf("parsing activity id: %w", err)
@@ -31,6 +31,9 @@ func (s *ActivityService) GetActivity(ctx context.Context, activityID string) (m
 			return model.Activity{}, apierr.ActivityNotFound()
 		}
 		return model.Activity{}, fmt.Errorf("getting activity: %w", err)
+	}
+	if err := requireRole(ctx, s.db, a.WorkspaceID, callerID, db.RoleViewer); err != nil {
+		return model.Activity{}, err
 	}
 	return activityToModel(a), nil
 }
