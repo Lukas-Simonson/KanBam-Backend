@@ -18,7 +18,11 @@ func NewColumnHandler(c *services.ColumnService) ColumnHandler {
 
 func (h *ColumnHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "columnID")
-	col, err := h.columns.GetColumn(r.Context(), id)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	col, err := h.columns.GetColumn(r.Context(), callerID, id)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -28,11 +32,15 @@ func (h *ColumnHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *ColumnHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "columnID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	req, ok := decodeAndValidate[model.ColumnUpdate](w, r)
 	if !ok {
 		return
 	}
-	col, err := h.columns.UpdateColumn(r.Context(), id, req)
+	col, err := h.columns.UpdateColumn(r.Context(), callerID, id, req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -42,7 +50,11 @@ func (h *ColumnHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 func (h *ColumnHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "columnID")
-	if err := h.columns.DeleteColumn(r.Context(), id); err != nil {
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.columns.DeleteColumn(r.Context(), callerID, id); err != nil {
 		handleError(w, err)
 		return
 	}

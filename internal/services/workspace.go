@@ -39,7 +39,7 @@ func (s *WorkspaceService) ListWorkspaces(ctx context.Context, userID string) ([
 	return result, nil
 }
 
-func (s *WorkspaceService) GetWorkspace(ctx context.Context, workspaceID string) (model.Workspace, error) {
+func (s *WorkspaceService) GetWorkspace(ctx context.Context, callerID, workspaceID string) (model.Workspace, error) {
 	id, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return model.Workspace{}, fmt.Errorf("parsing workspace id: %w", err)
@@ -50,6 +50,9 @@ func (s *WorkspaceService) GetWorkspace(ctx context.Context, workspaceID string)
 			return model.Workspace{}, apierr.WorkspaceNotFound()
 		}
 		return model.Workspace{}, fmt.Errorf("getting workspace: %w", err)
+	}
+	if err := requireRole(ctx, s.db, id, callerID, db.RoleViewer); err != nil {
+		return model.Workspace{}, err
 	}
 	return workspaceToModel(w), nil
 }
@@ -71,10 +74,13 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID string, r
 	return workspaceToModel(w), nil
 }
 
-func (s *WorkspaceService) UpdateWorkspace(ctx context.Context, workspaceID string, req model.WorkspaceUpdate) (model.Workspace, error) {
+func (s *WorkspaceService) UpdateWorkspace(ctx context.Context, callerID, workspaceID string, req model.WorkspaceUpdate) (model.Workspace, error) {
 	id, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return model.Workspace{}, fmt.Errorf("parsing workspace id: %w", err)
+	}
+	if err := requireRole(ctx, s.db, id, callerID, db.RoleAdmin); err != nil {
+		return model.Workspace{}, err
 	}
 	current, err := s.db.GetWorkspaceByID(ctx, id)
 	if err != nil {
@@ -84,7 +90,6 @@ func (s *WorkspaceService) UpdateWorkspace(ctx context.Context, workspaceID stri
 		return model.Workspace{}, fmt.Errorf("getting workspace: %w", err)
 	}
 
-	// Read-then-write: merge provided fields over current values.
 	title := current.Title
 	if req.Title != nil {
 		title = *req.Title
@@ -105,10 +110,13 @@ func (s *WorkspaceService) UpdateWorkspace(ctx context.Context, workspaceID stri
 	return workspaceToModel(w), nil
 }
 
-func (s *WorkspaceService) DeleteWorkspace(ctx context.Context, workspaceID string) error {
+func (s *WorkspaceService) DeleteWorkspace(ctx context.Context, callerID, workspaceID string) error {
 	id, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return fmt.Errorf("parsing workspace id: %w", err)
+	}
+	if err := requireRole(ctx, s.db, id, callerID, db.RoleOwner); err != nil {
+		return err
 	}
 	if err := s.db.DeleteWorkspace(ctx, id); err != nil {
 		return fmt.Errorf("deleting workspace: %w", err)
@@ -118,10 +126,13 @@ func (s *WorkspaceService) DeleteWorkspace(ctx context.Context, workspaceID stri
 
 // --- Members ---
 
-func (s *WorkspaceService) ListMembers(ctx context.Context, workspaceID string) ([]model.UserRole, error) {
+func (s *WorkspaceService) ListMembers(ctx context.Context, callerID, workspaceID string) ([]model.UserRole, error) {
 	id, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("parsing workspace id: %w", err)
+	}
+	if err := requireRole(ctx, s.db, id, callerID, db.RoleViewer); err != nil {
+		return nil, err
 	}
 	rows, err := s.db.GetWorkspaceMembers(ctx, id)
 	if err != nil {
@@ -142,10 +153,13 @@ func (s *WorkspaceService) ListMembers(ctx context.Context, workspaceID string) 
 	return result, nil
 }
 
-func (s *WorkspaceService) GetMember(ctx context.Context, workspaceID, userID string) (model.UserRole, error) {
+func (s *WorkspaceService) GetMember(ctx context.Context, callerID, workspaceID, userID string) (model.UserRole, error) {
 	wsID, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return model.UserRole{}, fmt.Errorf("parsing workspace id: %w", err)
+	}
+	if err := requireRole(ctx, s.db, wsID, callerID, db.RoleViewer); err != nil {
+		return model.UserRole{}, err
 	}
 	uID, err := convert.ParseUUID(userID)
 	if err != nil {
@@ -172,17 +186,19 @@ func (s *WorkspaceService) GetMember(ctx context.Context, workspaceID, userID st
 	}, nil
 }
 
-func (s *WorkspaceService) AddMember(ctx context.Context, workspaceID string, req model.Membership) error {
+func (s *WorkspaceService) AddMember(ctx context.Context, callerID, workspaceID string, req model.Membership) error {
 	wsID, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return fmt.Errorf("parsing workspace id: %w", err)
+	}
+	if err := requireRole(ctx, s.db, wsID, callerID, db.RoleAdmin); err != nil {
+		return err
 	}
 	uID, err := convert.ParseUUID(req.UserID)
 	if err != nil {
 		return fmt.Errorf("parsing user id: %w", err)
 	}
 
-	// Check if already a member.
 	_, err = s.db.GetWorkspaceMembership(ctx, db.GetWorkspaceMembershipParams{
 		WorkspaceID: wsID,
 		UserID:      uID,
@@ -204,10 +220,13 @@ func (s *WorkspaceService) AddMember(ctx context.Context, workspaceID string, re
 	return nil
 }
 
-func (s *WorkspaceService) UpdateMemberRole(ctx context.Context, workspaceID, userID string, req model.MembershipUpdate) error {
+func (s *WorkspaceService) UpdateMemberRole(ctx context.Context, callerID, workspaceID, userID string, req model.MembershipUpdate) error {
 	wsID, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return fmt.Errorf("parsing workspace id: %w", err)
+	}
+	if err := requireRole(ctx, s.db, wsID, callerID, db.RoleOwner); err != nil {
+		return err
 	}
 	uID, err := convert.ParseUUID(userID)
 	if err != nil {
@@ -223,11 +242,23 @@ func (s *WorkspaceService) UpdateMemberRole(ctx context.Context, workspaceID, us
 	return nil
 }
 
-func (s *WorkspaceService) RemoveMember(ctx context.Context, workspaceID, userID string) error {
+func (s *WorkspaceService) RemoveMember(ctx context.Context, callerID, workspaceID, userID string) error {
 	wsID, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return fmt.Errorf("parsing workspace id: %w", err)
 	}
+
+	// Any member can remove themselves; removing someone else requires admin.
+	if callerID == userID {
+		if err := requireRole(ctx, s.db, wsID, callerID, db.RoleViewer); err != nil {
+			return err
+		}
+	} else {
+		if err := requireRole(ctx, s.db, wsID, callerID, db.RoleAdmin); err != nil {
+			return err
+		}
+	}
+
 	uID, err := convert.ParseUUID(userID)
 	if err != nil {
 		return fmt.Errorf("parsing user id: %w", err)
@@ -243,10 +274,13 @@ func (s *WorkspaceService) RemoveMember(ctx context.Context, workspaceID, userID
 
 // --- Tags (workspace-scoped listing + creation) ---
 
-func (s *WorkspaceService) ListTags(ctx context.Context, workspaceID string) ([]model.Tag, error) {
+func (s *WorkspaceService) ListTags(ctx context.Context, callerID, workspaceID string) ([]model.Tag, error) {
 	id, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("parsing workspace id: %w", err)
+	}
+	if err := requireRole(ctx, s.db, id, callerID, db.RoleViewer); err != nil {
+		return nil, err
 	}
 	rows, err := s.db.GetTagsByWorkspace(ctx, id)
 	if err != nil {
@@ -259,10 +293,13 @@ func (s *WorkspaceService) ListTags(ctx context.Context, workspaceID string) ([]
 	return result, nil
 }
 
-func (s *WorkspaceService) CreateTag(ctx context.Context, workspaceID string, req model.TagCreation) (model.Tag, error) {
+func (s *WorkspaceService) CreateTag(ctx context.Context, callerID, workspaceID string, req model.TagCreation) (model.Tag, error) {
 	wsID, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return model.Tag{}, fmt.Errorf("parsing workspace id: %w", err)
+	}
+	if err := requireRole(ctx, s.db, wsID, callerID, db.RoleContributer); err != nil {
+		return model.Tag{}, err
 	}
 	t, err := s.db.CreateTag(ctx, db.CreateTagParams{
 		ID:          convert.NewUUID(),
@@ -281,10 +318,13 @@ func (s *WorkspaceService) CreateTag(ctx context.Context, workspaceID string, re
 
 // --- Activity ---
 
-func (s *WorkspaceService) GetActivity(ctx context.Context, workspaceID string, filters ActivityFilters) ([]model.Activity, error) {
+func (s *WorkspaceService) GetActivity(ctx context.Context, callerID, workspaceID string, filters ActivityFilters) ([]model.Activity, error) {
 	id, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("parsing workspace id: %w", err)
+	}
+	if err := requireRole(ctx, s.db, id, callerID, db.RoleViewer); err != nil {
+		return nil, err
 	}
 	rows, err := s.db.GetWorkspaceActivity(ctx, db.GetWorkspaceActivityParams{
 		WorkspaceID: id,

@@ -20,12 +20,22 @@ func NewCommentService(q *db.Queries) CommentService {
 	return CommentService{db: q}
 }
 
-func (s *CommentService) ListComments(ctx context.Context, cardID string) ([]model.Comment, error) {
-	id, err := convert.ParseUUID(cardID)
+func (s *CommentService) ListComments(ctx context.Context, callerID, cardID string) ([]model.Comment, error) {
+	cID, err := convert.ParseUUID(cardID)
 	if err != nil {
 		return nil, fmt.Errorf("parsing card id: %w", err)
 	}
-	rows, err := s.db.GetCommentsByCard(ctx, id)
+	card, err := s.db.GetCardByID(ctx, cID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apierr.CardNotFound()
+		}
+		return nil, fmt.Errorf("getting card: %w", err)
+	}
+	if err := requireRole(ctx, s.db, card.WorkspaceID, callerID, db.RoleViewer); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.GetCommentsByCard(ctx, cID)
 	if err != nil {
 		return nil, fmt.Errorf("listing comments: %w", err)
 	}
@@ -36,7 +46,7 @@ func (s *CommentService) ListComments(ctx context.Context, cardID string) ([]mod
 	return result, nil
 }
 
-func (s *CommentService) GetComment(ctx context.Context, commentID string) (model.Comment, error) {
+func (s *CommentService) GetComment(ctx context.Context, callerID, commentID string) (model.Comment, error) {
 	id, err := convert.ParseUUID(commentID)
 	if err != nil {
 		return model.Comment{}, fmt.Errorf("parsing comment id: %w", err)
@@ -48,13 +58,30 @@ func (s *CommentService) GetComment(ctx context.Context, commentID string) (mode
 		}
 		return model.Comment{}, fmt.Errorf("getting comment: %w", err)
 	}
+	card, err := s.db.GetCardByID(ctx, c.CardID)
+	if err != nil {
+		return model.Comment{}, fmt.Errorf("getting card for comment: %w", err)
+	}
+	if err := requireRole(ctx, s.db, card.WorkspaceID, callerID, db.RoleViewer); err != nil {
+		return model.Comment{}, err
+	}
 	return commentToModel(c), nil
 }
 
-func (s *CommentService) CreateComment(ctx context.Context, cardID, userID string, req model.CommentCreation) (model.Comment, error) {
+func (s *CommentService) CreateComment(ctx context.Context, callerID, cardID, userID string, req model.CommentCreation) (model.Comment, error) {
 	cID, err := convert.ParseUUID(cardID)
 	if err != nil {
 		return model.Comment{}, fmt.Errorf("parsing card id: %w", err)
+	}
+	card, err := s.db.GetCardByID(ctx, cID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.Comment{}, apierr.CardNotFound()
+		}
+		return model.Comment{}, fmt.Errorf("getting card: %w", err)
+	}
+	if err := requireRole(ctx, s.db, card.WorkspaceID, callerID, db.RoleContributer); err != nil {
+		return model.Comment{}, err
 	}
 	uID, err := convert.ParseUUID(userID)
 	if err != nil {
@@ -72,11 +99,33 @@ func (s *CommentService) CreateComment(ctx context.Context, cardID, userID strin
 	return commentToModel(c), nil
 }
 
-func (s *CommentService) UpdateComment(ctx context.Context, commentID string, req model.CommentUpdate) (model.Comment, error) {
+func (s *CommentService) UpdateComment(ctx context.Context, callerID, commentID string, req model.CommentUpdate) (model.Comment, error) {
 	id, err := convert.ParseUUID(commentID)
 	if err != nil {
 		return model.Comment{}, fmt.Errorf("parsing comment id: %w", err)
 	}
+	existing, err := s.db.GetCommentByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.Comment{}, apierr.CommentNotFound()
+		}
+		return model.Comment{}, fmt.Errorf("getting comment: %w", err)
+	}
+	card, err := s.db.GetCardByID(ctx, existing.CardID)
+	if err != nil {
+		return model.Comment{}, fmt.Errorf("getting card for comment: %w", err)
+	}
+
+	// Comment authors can edit their own comments; otherwise require admin.
+	isOwn := convert.UUIDToString(existing.UserID) == callerID
+	minRole := db.RoleAdmin
+	if isOwn {
+		minRole = db.RoleViewer
+	}
+	if err := requireRole(ctx, s.db, card.WorkspaceID, callerID, minRole); err != nil {
+		return model.Comment{}, err
+	}
+
 	c, err := s.db.UpdateComment(ctx, db.UpdateCommentParams{
 		ID:   id,
 		Body: req.Body,
@@ -90,11 +139,33 @@ func (s *CommentService) UpdateComment(ctx context.Context, commentID string, re
 	return commentToModel(c), nil
 }
 
-func (s *CommentService) DeleteComment(ctx context.Context, commentID string) error {
+func (s *CommentService) DeleteComment(ctx context.Context, callerID, commentID string) error {
 	id, err := convert.ParseUUID(commentID)
 	if err != nil {
 		return fmt.Errorf("parsing comment id: %w", err)
 	}
+	existing, err := s.db.GetCommentByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apierr.CommentNotFound()
+		}
+		return fmt.Errorf("getting comment: %w", err)
+	}
+	card, err := s.db.GetCardByID(ctx, existing.CardID)
+	if err != nil {
+		return fmt.Errorf("getting card for comment: %w", err)
+	}
+
+	// Comment authors can delete their own comments; otherwise require admin.
+	isOwn := convert.UUIDToString(existing.UserID) == callerID
+	minRole := db.RoleAdmin
+	if isOwn {
+		minRole = db.RoleViewer
+	}
+	if err := requireRole(ctx, s.db, card.WorkspaceID, callerID, minRole); err != nil {
+		return err
+	}
+
 	if err := s.db.DeleteComment(ctx, id); err != nil {
 		return fmt.Errorf("deleting comment: %w", err)
 	}

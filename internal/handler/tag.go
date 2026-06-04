@@ -18,7 +18,11 @@ func NewTagHandler(t *services.TagService) TagHandler {
 
 func (h *TagHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "tagID")
-	tag, err := h.tags.GetTag(r.Context(), id)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	tag, err := h.tags.GetTag(r.Context(), callerID, id)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -28,11 +32,15 @@ func (h *TagHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *TagHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "tagID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	req, ok := decodeAndValidate[model.TagUpdate](w, r)
 	if !ok {
 		return
 	}
-	tag, err := h.tags.UpdateTag(r.Context(), id, req)
+	tag, err := h.tags.UpdateTag(r.Context(), callerID, id, req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -42,7 +50,11 @@ func (h *TagHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 func (h *TagHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "tagID")
-	if err := h.tags.DeleteTag(r.Context(), id); err != nil {
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.tags.DeleteTag(r.Context(), callerID, id); err != nil {
 		handleError(w, err)
 		return
 	}

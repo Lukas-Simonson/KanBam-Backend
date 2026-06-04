@@ -20,7 +20,11 @@ func NewBoardHandler(b *services.BoardService, col *services.ColumnService, c *s
 
 func (h *BoardHandler) List(w http.ResponseWriter, r *http.Request) {
 	wsID := chi.URLParam(r, "workspaceID")
-	boards, err := h.boards.ListBoards(r.Context(), wsID)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	boards, err := h.boards.ListBoards(r.Context(), callerID, wsID)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -30,11 +34,15 @@ func (h *BoardHandler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) Create(w http.ResponseWriter, r *http.Request) {
 	wsID := chi.URLParam(r, "workspaceID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	req, ok := decodeAndValidate[model.BoardCreation](w, r)
 	if !ok {
 		return
 	}
-	board, err := h.boards.CreateBoard(r.Context(), wsID, req)
+	board, err := h.boards.CreateBoard(r.Context(), callerID, wsID, req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -44,7 +52,11 @@ func (h *BoardHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "boardID")
-	board, err := h.boards.GetBoard(r.Context(), id)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	board, err := h.boards.GetBoard(r.Context(), callerID, id)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -54,11 +66,15 @@ func (h *BoardHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "boardID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	req, ok := decodeAndValidate[model.BoardUpdate](w, r)
 	if !ok {
 		return
 	}
-	board, err := h.boards.UpdateBoard(r.Context(), id, req)
+	board, err := h.boards.UpdateBoard(r.Context(), callerID, id, req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -68,7 +84,11 @@ func (h *BoardHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "boardID")
-	if err := h.boards.DeleteBoard(r.Context(), id); err != nil {
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.boards.DeleteBoard(r.Context(), callerID, id); err != nil {
 		handleError(w, err)
 		return
 	}
@@ -79,7 +99,11 @@ func (h *BoardHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) ListColumns(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "boardID")
-	cols, err := h.columns.ListColumnsWithCards(r.Context(), id)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	cols, err := h.columns.ListColumnsWithCards(r.Context(), callerID, id)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -89,11 +113,15 @@ func (h *BoardHandler) ListColumns(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) CreateColumn(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "boardID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	req, ok := decodeAndValidate[model.ColumnCreation](w, r)
 	if !ok {
 		return
 	}
-	col, err := h.columns.CreateColumn(r.Context(), id, req)
+	col, err := h.columns.CreateColumn(r.Context(), callerID, id, req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -105,7 +133,11 @@ func (h *BoardHandler) CreateColumn(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) ListCards(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "boardID")
-	cards, err := h.cards.ListCardsWithTags(r.Context(), id)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	cards, err := h.cards.ListCardsWithTags(r.Context(), callerID, id)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -115,15 +147,15 @@ func (h *BoardHandler) ListCards(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) CreateCard(w http.ResponseWriter, r *http.Request) {
 	bID := chi.URLParam(r, "boardID")
-	wsID := chi.URLParam(r, "workspaceID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 
-	board, err := h.boards.GetBoard(r.Context(), bID)
+	board, err := h.boards.GetBoard(r.Context(), callerID, bID)
 	if err != nil {
 		handleError(w, err)
 		return
-	}
-	if wsID == "" {
-		wsID = board.WorkspaceID
 	}
 
 	req, ok := decodeAndValidate[model.CardCreation](w, r)
@@ -131,7 +163,7 @@ func (h *BoardHandler) CreateCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	card, err := h.cards.CreateCard(r.Context(), bID, wsID, "", req)
+	card, err := h.cards.CreateCard(r.Context(), callerID, bID, board.WorkspaceID, req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -143,7 +175,11 @@ func (h *BoardHandler) CreateCard(w http.ResponseWriter, r *http.Request) {
 
 func (h *BoardHandler) GetActivity(w http.ResponseWriter, r *http.Request) {
 	bID := chi.URLParam(r, "boardID")
-	board, err := h.boards.GetBoard(r.Context(), bID)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	board, err := h.boards.GetBoard(r.Context(), callerID, bID)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -155,7 +191,7 @@ func (h *BoardHandler) GetActivity(w http.ResponseWriter, r *http.Request) {
 		After:  parseQueryTime(q.Get("after")),
 		Before: parseQueryTime(q.Get("before")),
 	}
-	activities, err := h.boards.GetActivity(r.Context(), bID, board.WorkspaceID, filters)
+	activities, err := h.boards.GetActivity(r.Context(), callerID, bID, board.WorkspaceID, filters)
 	if err != nil {
 		handleError(w, err)
 		return

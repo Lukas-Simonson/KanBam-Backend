@@ -49,7 +49,11 @@ func (h *WorkspaceHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "workspaceID")
-	ws, err := h.workspaces.GetWorkspace(r.Context(), id)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	ws, err := h.workspaces.GetWorkspace(r.Context(), callerID, id)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -59,11 +63,15 @@ func (h *WorkspaceHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "workspaceID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	req, ok := decodeAndValidate[model.WorkspaceUpdate](w, r)
 	if !ok {
 		return
 	}
-	ws, err := h.workspaces.UpdateWorkspace(r.Context(), id, req)
+	ws, err := h.workspaces.UpdateWorkspace(r.Context(), callerID, id, req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -73,7 +81,11 @@ func (h *WorkspaceHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "workspaceID")
-	if err := h.workspaces.DeleteWorkspace(r.Context(), id); err != nil {
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.workspaces.DeleteWorkspace(r.Context(), callerID, id); err != nil {
 		handleError(w, err)
 		return
 	}
@@ -84,7 +96,11 @@ func (h *WorkspaceHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "workspaceID")
-	members, err := h.workspaces.ListMembers(r.Context(), id)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	members, err := h.workspaces.ListMembers(r.Context(), callerID, id)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -94,11 +110,15 @@ func (h *WorkspaceHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "workspaceID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	req, ok := decodeAndValidate[model.Membership](w, r)
 	if !ok {
 		return
 	}
-	if err := h.workspaces.AddMember(r.Context(), id, req); err != nil {
+	if err := h.workspaces.AddMember(r.Context(), callerID, id, req); err != nil {
 		handleError(w, err)
 		return
 	}
@@ -108,7 +128,11 @@ func (h *WorkspaceHandler) AddMember(w http.ResponseWriter, r *http.Request) {
 func (h *WorkspaceHandler) GetMember(w http.ResponseWriter, r *http.Request) {
 	wsID := chi.URLParam(r, "workspaceID")
 	uID := chi.URLParam(r, "userID")
-	member, err := h.workspaces.GetMember(r.Context(), wsID, uID)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	member, err := h.workspaces.GetMember(r.Context(), callerID, wsID, uID)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -119,11 +143,15 @@ func (h *WorkspaceHandler) GetMember(w http.ResponseWriter, r *http.Request) {
 func (h *WorkspaceHandler) UpdateMemberRole(w http.ResponseWriter, r *http.Request) {
 	wsID := chi.URLParam(r, "workspaceID")
 	uID := chi.URLParam(r, "userID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	req, ok := decodeAndValidate[model.MembershipUpdate](w, r)
 	if !ok {
 		return
 	}
-	if err := h.workspaces.UpdateMemberRole(r.Context(), wsID, uID, req); err != nil {
+	if err := h.workspaces.UpdateMemberRole(r.Context(), callerID, wsID, uID, req); err != nil {
 		handleError(w, err)
 		return
 	}
@@ -133,7 +161,11 @@ func (h *WorkspaceHandler) UpdateMemberRole(w http.ResponseWriter, r *http.Reque
 func (h *WorkspaceHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 	wsID := chi.URLParam(r, "workspaceID")
 	uID := chi.URLParam(r, "userID")
-	if err := h.workspaces.RemoveMember(r.Context(), wsID, uID); err != nil {
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.workspaces.RemoveMember(r.Context(), callerID, wsID, uID); err != nil {
 		handleError(w, err)
 		return
 	}
@@ -144,7 +176,11 @@ func (h *WorkspaceHandler) RemoveMember(w http.ResponseWriter, r *http.Request) 
 
 func (h *WorkspaceHandler) ListTags(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "workspaceID")
-	tags, err := h.workspaces.ListTags(r.Context(), id)
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
+	tags, err := h.workspaces.ListTags(r.Context(), callerID, id)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -154,11 +190,15 @@ func (h *WorkspaceHandler) ListTags(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) CreateTag(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "workspaceID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	req, ok := decodeAndValidate[model.TagCreation](w, r)
 	if !ok {
 		return
 	}
-	tag, err := h.workspaces.CreateTag(r.Context(), id, req)
+	tag, err := h.workspaces.CreateTag(r.Context(), callerID, id, req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -170,6 +210,10 @@ func (h *WorkspaceHandler) CreateTag(w http.ResponseWriter, r *http.Request) {
 
 func (h *WorkspaceHandler) GetActivity(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "workspaceID")
+	callerID, ok := mustCallerID(w, r)
+	if !ok {
+		return
+	}
 	q := r.URL.Query()
 	filters := services.ActivityFilters{
 		BoardID: parseQueryUUID(q.Get("boardID")),
@@ -178,7 +222,7 @@ func (h *WorkspaceHandler) GetActivity(w http.ResponseWriter, r *http.Request) {
 		After:   parseQueryTime(q.Get("after")),
 		Before:  parseQueryTime(q.Get("before")),
 	}
-	activities, err := h.workspaces.GetActivity(r.Context(), id, filters)
+	activities, err := h.workspaces.GetActivity(r.Context(), callerID, id, filters)
 	if err != nil {
 		handleError(w, err)
 		return

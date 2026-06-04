@@ -20,12 +20,15 @@ func NewBoardService(q *db.Queries) BoardService {
 	return BoardService{db: q}
 }
 
-func (s *BoardService) ListBoards(ctx context.Context, workspaceID string) ([]model.Board, error) {
-	id, err := convert.ParseUUID(workspaceID)
+func (s *BoardService) ListBoards(ctx context.Context, callerID, workspaceID string) ([]model.Board, error) {
+	wsID, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("parsing workspace id: %w", err)
 	}
-	rows, err := s.db.GetBoardsByWorkspace(ctx, id)
+	if err := requireRole(ctx, s.db, wsID, callerID, db.RoleViewer); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.GetBoardsByWorkspace(ctx, wsID)
 	if err != nil {
 		return nil, fmt.Errorf("listing boards: %w", err)
 	}
@@ -36,7 +39,7 @@ func (s *BoardService) ListBoards(ctx context.Context, workspaceID string) ([]mo
 	return result, nil
 }
 
-func (s *BoardService) GetBoard(ctx context.Context, boardID string) (model.Board, error) {
+func (s *BoardService) GetBoard(ctx context.Context, callerID, boardID string) (model.Board, error) {
 	id, err := convert.ParseUUID(boardID)
 	if err != nil {
 		return model.Board{}, fmt.Errorf("parsing board id: %w", err)
@@ -48,13 +51,19 @@ func (s *BoardService) GetBoard(ctx context.Context, boardID string) (model.Boar
 		}
 		return model.Board{}, fmt.Errorf("getting board: %w", err)
 	}
+	if err := requireRole(ctx, s.db, b.WorkspaceID, callerID, db.RoleViewer); err != nil {
+		return model.Board{}, err
+	}
 	return boardToModel(b), nil
 }
 
-func (s *BoardService) CreateBoard(ctx context.Context, workspaceID string, req model.BoardCreation) (model.Board, error) {
+func (s *BoardService) CreateBoard(ctx context.Context, callerID, workspaceID string, req model.BoardCreation) (model.Board, error) {
 	wsID, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return model.Board{}, fmt.Errorf("parsing workspace id: %w", err)
+	}
+	if err := requireRole(ctx, s.db, wsID, callerID, db.RoleContributer); err != nil {
+		return model.Board{}, err
 	}
 	b, err := s.db.CreateBoard(ctx, db.CreateBoardParams{
 		ID:          convert.NewUUID(),
@@ -72,7 +81,7 @@ func (s *BoardService) CreateBoard(ctx context.Context, workspaceID string, req 
 	return boardToModel(b), nil
 }
 
-func (s *BoardService) UpdateBoard(ctx context.Context, boardID string, req model.BoardUpdate) (model.Board, error) {
+func (s *BoardService) UpdateBoard(ctx context.Context, callerID, boardID string, req model.BoardUpdate) (model.Board, error) {
 	id, err := convert.ParseUUID(boardID)
 	if err != nil {
 		return model.Board{}, fmt.Errorf("parsing board id: %w", err)
@@ -83,6 +92,9 @@ func (s *BoardService) UpdateBoard(ctx context.Context, boardID string, req mode
 			return model.Board{}, apierr.BoardNotFound()
 		}
 		return model.Board{}, fmt.Errorf("getting board: %w", err)
+	}
+	if err := requireRole(ctx, s.db, current.WorkspaceID, callerID, db.RoleAdmin); err != nil {
+		return model.Board{}, err
 	}
 
 	title := current.Title
@@ -110,10 +122,20 @@ func (s *BoardService) UpdateBoard(ctx context.Context, boardID string, req mode
 	return boardToModel(b), nil
 }
 
-func (s *BoardService) DeleteBoard(ctx context.Context, boardID string) error {
+func (s *BoardService) DeleteBoard(ctx context.Context, callerID, boardID string) error {
 	id, err := convert.ParseUUID(boardID)
 	if err != nil {
 		return fmt.Errorf("parsing board id: %w", err)
+	}
+	b, err := s.db.GetBoardByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apierr.BoardNotFound()
+		}
+		return fmt.Errorf("getting board: %w", err)
+	}
+	if err := requireRole(ctx, s.db, b.WorkspaceID, callerID, db.RoleAdmin); err != nil {
+		return err
 	}
 	if err := s.db.DeleteBoard(ctx, id); err != nil {
 		return fmt.Errorf("deleting board: %w", err)
@@ -121,7 +143,7 @@ func (s *BoardService) DeleteBoard(ctx context.Context, boardID string) error {
 	return nil
 }
 
-func (s *BoardService) GetActivity(ctx context.Context, boardID string, workspaceID string, filters ActivityFilters) ([]model.Activity, error) {
+func (s *BoardService) GetActivity(ctx context.Context, callerID, boardID string, workspaceID string, filters ActivityFilters) ([]model.Activity, error) {
 	bID, err := convert.ParseUUID(boardID)
 	if err != nil {
 		return nil, fmt.Errorf("parsing board id: %w", err)
@@ -129,6 +151,9 @@ func (s *BoardService) GetActivity(ctx context.Context, boardID string, workspac
 	wsID, err := convert.ParseUUID(workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("parsing workspace id: %w", err)
+	}
+	if err := requireRole(ctx, s.db, wsID, callerID, db.RoleViewer); err != nil {
+		return nil, err
 	}
 	rows, err := s.db.GetBoardActivity(ctx, db.GetBoardActivityParams{
 		WorkspaceID: wsID,
