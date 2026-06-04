@@ -1,0 +1,2628 @@
+openapi: 3.1.0
+info:
+  title: KanBam REST API
+  version: 0.0.0
+tags:
+  - name: Authentication
+  - name: Workspaces
+  - name: Boards
+  - name: Tags
+  - name: Activity
+  - name: Columns
+  - name: Cards
+  - name: Comments
+paths:
+  /api/v1/activity/{activityID}:
+    get:
+      operationId: Activity_getActivityWithID
+      summary: Get Activity Entry
+      description: Gets details about a specific activity entry.
+      parameters:
+        - name: activityID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The specified activity entry.
+          content:
+            application/json:
+              schema: {}
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.ActivityNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Activity
+      security:
+        - BearerAuth: []
+  /api/v1/auth/login:
+    post:
+      operationId: Auth_login
+      summary: Get User Access Token
+      description: Authenticates and provides a JWT for the authorized user.
+      parameters: []
+      responses:
+        '200':
+          description: The authenticated users information, including an Auth token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.UserToken'
+        '401':
+          description: Invalid Username or Passoword
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.InvalidCredentials'
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Authentication
+      security:
+        - BasicAuth: []
+  /api/v1/auth/register:
+    post:
+      operationId: Auth_register
+      summary: Register User
+      description: Registers a new user with this service.
+      parameters: []
+      responses:
+        '201':
+          description: The registered users infomration, including an Auth token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.UserToken'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.EmailTaken'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.Registration'
+  /api/v1/auth/updatePassword:
+    post:
+      operationId: Auth_updatePassword
+      summary: Update User Password
+      description: Updates the authenticated users current password.
+      parameters: []
+      responses:
+        '200':
+          description: The request has succeeded.
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.InvalidPassword'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.UpdatePassword'
+      security:
+        - BearerAuth: []
+  /api/v1/boards/boards/{boardID}/activity:
+    get:
+      operationId: Activity_getBoardActivity
+      summary: Get Board Activity
+      description: Gets all activity on the specified board. Results can be narrowed to a specific card or user, and filtered by date range.
+      parameters:
+        - name: boardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: cardID
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          explode: false
+        - name: userID
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          explode: false
+        - name: after
+          in: query
+          required: false
+          schema:
+            type: string
+            format: ISO8601
+          explode: false
+        - name: before
+          in: query
+          required: false
+          schema:
+            type: string
+            format: ISO8601
+          explode: false
+      responses:
+        '200':
+          description: The activity entries matching the given filters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Activities'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.BoardNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Boards
+        - Activity
+      security:
+        - BearerAuth: []
+  /api/v1/boards/{boardID}:
+    get:
+      operationId: Boards_getBoardWithID
+      summary: Get Board
+      description: Gets details about a specific board.
+      parameters:
+        - name: boardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The specified board details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Board'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.BoardNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Boards
+      security:
+        - BearerAuth: []
+    patch:
+      operationId: Boards_updateBoardWithID
+      summary: Update Board
+      description: Updates a specific board's details.
+      parameters:
+        - name: boardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The updated board details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Board'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.BoardNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Boards
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.BoardUpdate'
+      security:
+        - BearerAuth: []
+    delete:
+      operationId: Boards_deleteBoard
+      summary: Delete Board
+      description: Deletes a specific board.
+      parameters:
+        - name: boardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: There is no content to send for this request, but the headers may be useful.
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.BoardNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Boards
+      security:
+        - BearerAuth: []
+  /api/v1/boards/{boardID}/cards:
+    get:
+      operationId: Cards_getAllCards
+      summary: Get Cards
+      description: Gets all cards within the specified board, each with their associated tags.
+      parameters:
+        - name: boardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The cards within the board.
+          content:
+            application/json:
+              schema: {}
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.BoardNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Boards
+        - Cards
+      security:
+        - BearerAuth: []
+  /api/v1/boards/{boardID}/cards/create:
+    post:
+      operationId: Cards_createCard
+      summary: Create a Card
+      description: Creates a new card within the specified board.
+      parameters:
+        - name: boardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: The newly created card.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.CardWithTags'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.BoardNotFound'
+                  - $ref: '#/components/schemas/Errors.ColumnNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Boards
+        - Cards
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.CardCreation'
+      security:
+        - BearerAuth: []
+  /api/v1/boards/{boardID}/columns:
+    get:
+      operationId: Columns_getAllColumns
+      summary: Get Columns
+      description: Gets all columns within the specified board, each with their associated cards.
+      parameters:
+        - name: boardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The columns within the board.
+          content:
+            application/json:
+              schema: {}
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.BoardNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Boards
+        - Columns
+      security:
+        - BearerAuth: []
+  /api/v1/boards/{boardID}/columns/create:
+    post:
+      operationId: Columns_createColumn
+      summary: Create a Column
+      description: Creates a new column within the specified board.
+      parameters:
+        - name: boardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: The newly created column.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Column'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.BoardNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Boards
+        - Columns
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.ColumnCreation'
+      security:
+        - BearerAuth: []
+  /api/v1/cards/cards/{cardID}/activity:
+    get:
+      operationId: Activity_getCardActivity
+      summary: Get Card Activity
+      description: Gets all activity on the specified card. Results can be narrowed to a specific user and filtered by date range.
+      parameters:
+        - name: cardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userID
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          explode: false
+        - name: after
+          in: query
+          required: false
+          schema:
+            type: string
+            format: ISO8601
+          explode: false
+        - name: before
+          in: query
+          required: false
+          schema:
+            type: string
+            format: ISO8601
+          explode: false
+      responses:
+        '200':
+          description: The activity entries matching the given filters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Activities'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.CardNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Cards
+        - Activity
+      security:
+        - BearerAuth: []
+  /api/v1/cards/{cardID}:
+    get:
+      operationId: Cards_getCardWithID
+      summary: Get Card
+      description: Gets details about a specific card, including its tags.
+      parameters:
+        - name: cardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The specified card details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.CardWithTags'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.CardNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Cards
+      security:
+        - BearerAuth: []
+    patch:
+      operationId: Cards_updateCardWithID
+      summary: Update Card
+      description: Updates a specific card's details.
+      parameters:
+        - name: cardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The updated card details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.CardWithTags'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.CardNotFound'
+                  - $ref: '#/components/schemas/Errors.ColumnNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Cards
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.CardUpdate'
+      security:
+        - BearerAuth: []
+    delete:
+      operationId: Cards_deleteCard
+      summary: Delete Card
+      description: Deletes a specific card.
+      parameters:
+        - name: cardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: There is no content to send for this request, but the headers may be useful.
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.CardNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Cards
+      security:
+        - BearerAuth: []
+  /api/v1/cards/{cardID}/comments:
+    get:
+      operationId: Comments_getAllComments
+      summary: Get Comments
+      description: Gets all comments on the specified card.
+      parameters:
+        - name: cardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The comments on the card.
+          content:
+            application/json:
+              schema: {}
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.CardNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Cards
+        - Comments
+      security:
+        - BearerAuth: []
+  /api/v1/cards/{cardID}/comments/create:
+    post:
+      operationId: Comments_createComment
+      summary: Create a Comment
+      description: Creates a new comment on the specified card.
+      parameters:
+        - name: cardID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: The newly created comment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Comment'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.CardNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Cards
+        - Comments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.CommentCreation'
+      security:
+        - BearerAuth: []
+  /api/v1/columns/{columnID}:
+    get:
+      operationId: Columns_getColumnWithID
+      summary: Get Column
+      description: Gets details about a specific column.
+      parameters:
+        - name: columnID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The specified column details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Column'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.ColumnNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Columns
+      security:
+        - BearerAuth: []
+    patch:
+      operationId: Columns_updateColumnWithID
+      summary: Update Column
+      description: Updates a specific column's details.
+      parameters:
+        - name: columnID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The updated column details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Column'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.ColumnNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Columns
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.ColumnUpdate'
+      security:
+        - BearerAuth: []
+    delete:
+      operationId: Columns_deleteColumn
+      summary: Delete Column
+      description: Deletes a specific column.
+      parameters:
+        - name: columnID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: There is no content to send for this request, but the headers may be useful.
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.ColumnNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Columns
+      security:
+        - BearerAuth: []
+  /api/v1/comments/{commentID}:
+    get:
+      operationId: Comments_getCommentWithID
+      summary: Get Comment
+      description: Gets details about a specific comment.
+      parameters:
+        - name: commentID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The specified comment details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Comment'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.CommentNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Comments
+      security:
+        - BearerAuth: []
+    patch:
+      operationId: Comments_updateCommentWithID
+      summary: Update Comment
+      description: Updates the body of a specific comment.
+      parameters:
+        - name: commentID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The updated comment details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Comment'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.CommentNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Comments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.CommentUpdate'
+      security:
+        - BearerAuth: []
+    delete:
+      operationId: Comments_deleteComment
+      summary: Delete Comment
+      description: Deletes a specific comment.
+      parameters:
+        - name: commentID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: There is no content to send for this request, but the headers may be useful.
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.CommentNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Comments
+      security:
+        - BearerAuth: []
+  /api/v1/tags/{tagID}:
+    get:
+      operationId: Tags_getTagWithID
+      summary: Get Tag
+      description: Gets details about a specific tag.
+      parameters:
+        - name: tagID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The specified tag details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Tag'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.TagNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Tags
+      security:
+        - BearerAuth: []
+    patch:
+      operationId: Tags_updateTagWithID
+      summary: Update Tag
+      description: Updates a specific tag's details.
+      parameters:
+        - name: tagID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The updated tag details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Tag'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.TagNotFound'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.TagNameTaken'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Tags
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.TagUpdate'
+      security:
+        - BearerAuth: []
+    delete:
+      operationId: Tags_deleteTag
+      summary: Delete Tag
+      description: Deletes a specific tag.
+      parameters:
+        - name: tagID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: There is no content to send for this request, but the headers may be useful.
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '404':
+          description: The server cannot find the requested resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.TagNotFound'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Tags
+      security:
+        - BearerAuth: []
+  /api/v1/workspaces:
+    get:
+      operationId: Workspaces_getAllWorkspaces
+      summary: Get Workspaces
+      description: Gets all workspaces that the authenticated user has access to.
+      parameters: []
+      responses:
+        '200':
+          description: The workpaces the user has access to.
+          content:
+            application/json:
+              schema: {}
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.AuthMissing'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+      security:
+        - BearerAuth: []
+  /api/v1/workspaces/create:
+    post:
+      operationId: Workspaces_createWorkspace
+      summary: Create a Workspace
+      description: Creates a new workspace owned by the authenticatd user.
+      parameters: []
+      responses:
+        '201':
+          description: The newly created workspace.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Workspace'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.AuthMissing'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.WorkspaceCreation'
+      security:
+        - BearerAuth: []
+  /api/v1/workspaces/{workspaceID}:
+    get:
+      operationId: Workspaces_getWorkspaceWithID
+      summary: Get Workspace
+      description: Gets details about a specific workspace
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The specified workspace details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Workspace'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+      security:
+        - BearerAuth: []
+    patch:
+      operationId: Workspaces_updateWorkspaceWithID
+      summary: Update Workspace
+      description: Update a specific workspace's details.
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The updated workspace detals.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Workspace'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+      security:
+        - BearerAuth: []
+    delete:
+      operationId: Workspaces_deleteWorkspace
+      summary: Delete a workspace
+      description: Deletes a workspace owned by the authenticated user.
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: There is no content to send for this request, but the headers may be useful.
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+      security:
+        - BearerAuth: []
+  /api/v1/workspaces/{workspaceID}/activity:
+    get:
+      operationId: Activity_getWorkspaceActivity
+      summary: Get Workspace Activity
+      description: Gets all activity within the specified workspace. Results can be narrowed to a specific board, card, or user, and filtered by date range.
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: boardID
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          explode: false
+        - name: cardID
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          explode: false
+        - name: userID
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          explode: false
+        - name: after
+          in: query
+          required: false
+          schema:
+            type: string
+            format: ISO8601
+          explode: false
+        - name: before
+          in: query
+          required: false
+          schema:
+            type: string
+            format: ISO8601
+          explode: false
+      responses:
+        '200':
+          description: The activity entries matching the given filters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Activities'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+        - Activity
+      security:
+        - BearerAuth: []
+  /api/v1/workspaces/{workspaceID}/boards:
+    get:
+      operationId: Boards_getAllBoards
+      summary: Get Boards
+      description: Gets all boards within the specified workspace that the authenticated user has access to.
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The boards within the workspace.
+          content:
+            application/json:
+              schema: {}
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+        - Boards
+      security:
+        - BearerAuth: []
+  /api/v1/workspaces/{workspaceID}/boards/create:
+    post:
+      operationId: Boards_createBoard
+      summary: Create a Board
+      description: Creates a new board within the specified workspace.
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: The newly created board.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Board'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.BoardPrefixTaken'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+        - Boards
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.BoardCreation'
+      security:
+        - BearerAuth: []
+  /api/v1/workspaces/{workspaceID}/members:
+    post:
+      operationId: Members_addMember
+      summary: Add a Workspace Member
+      description: Give a new user workspace access.
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: There is no content to send for this request, but the headers may be useful.
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.UserAlreadyInWorkspace'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.Membership'
+      security:
+        - BearerAuth: []
+    get:
+      operationId: Members_getAllMembers
+      summary: Get Workspace Members
+      description: Get all users in the specified workspace.
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema: {}
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+      security:
+        - BearerAuth: []
+  /api/v1/workspaces/{workspaceID}/members/{userID}:
+    get:
+      operationId: Members_getMemberWithID
+      summary: Get Workspace Member
+      description: Get workspace member with a specified id
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.UserRole'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+      security:
+        - BearerAuth: []
+    patch:
+      operationId: Members_changeMemberRoleInWorkspaceWithID
+      summary: Update a Workspace Member
+      description: Modify a workspace members roles.
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: There is no content to send for this request, but the headers may be useful.
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.MembershipUpdate'
+      security:
+        - BearerAuth: []
+    delete:
+      operationId: Members_deleteMemberFromWorkspaceWithID
+      summary: Remove A Workspace Member
+      description: Removes a member of the workspace.
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: There is no content to send for this request, but the headers may be useful.
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+      security:
+        - BearerAuth: []
+  /api/v1/workspaces/{workspaceID}/tags:
+    get:
+      operationId: Tags_getAllTags
+      summary: Get Tags
+      description: Gets all tags within the specified workspace.
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The tags within the workspace.
+          content:
+            application/json:
+              schema: {}
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+        - Tags
+      security:
+        - BearerAuth: []
+  /api/v1/workspaces/{workspaceID}/tags/create:
+    post:
+      operationId: Tags_createTag
+      summary: Create a Tag
+      description: Creates a new tag within the specified workspace.
+      parameters:
+        - name: workspaceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: The newly created tag.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Models.Tag'
+        '401':
+          description: Auth Missing
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/Errors.AuthMissing'
+                  - $ref: '#/components/schemas/Errors.NotAuthorized'
+        '409':
+          description: The request conflicts with the current state of the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.TagNameTaken'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Errors.Error'
+      tags:
+        - Workspaces
+        - Tags
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Models.TagCreation'
+      security:
+        - BearerAuth: []
+components:
+  schemas:
+    Errors.ActivityNotFound:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      examples:
+        - code: ACTIVITY_NOT_FOUND
+          reason: The specified activity entry does not exist.
+    Errors.AuthMissing:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      description: Auth Missing
+      examples:
+        - code: INVALID_AUTH
+          reason: Authentication is missing or malformed
+    Errors.BoardNotFound:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      examples:
+        - code: BOARD_NOT_FOUND
+          reason: The specified board does not exist.
+    Errors.BoardPrefixTaken:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      examples:
+        - code: BOARD_PREFIX_TAKEN
+          reason: A board with this prefix already exists in this workspace.
+    Errors.CardNotFound:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      examples:
+        - code: CARD_NOT_FOUND
+          reason: The specified card does not exist.
+    Errors.ColumnNotFound:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      examples:
+        - code: COLUMN_NOT_FOUND
+          reason: The specified column does not exist.
+    Errors.CommentNotFound:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      examples:
+        - code: COMMENT_NOT_FOUND
+          reason: The specified comment does not exist.
+    Errors.EmailTaken:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      examples:
+        - code: EMAIL_TAKEN
+          reason: This email is already in use.
+    Errors.Error:
+      type: object
+      required:
+        - code
+        - reason
+      properties:
+        code:
+          type: string
+        reason:
+          type: string
+    Errors.InvalidCredentials:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      description: Invalid Username or Passoword
+      examples:
+        - code: INVALID_CREDENTIALS
+          reason: Invalid username or password provided.
+    Errors.InvalidPassword:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      description: Invalid Password
+      examples:
+        - code: INVALID_PASSWORD
+          reason: Current password is incorrect
+    Errors.NotAuthorized:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      description: User Cannot Perform This Action
+      examples:
+        - code: NOT_AUTHORIZED
+          reason: This user does not have permission to perform this action in this workspace.
+    Errors.TagNameTaken:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      examples:
+        - code: TAG_NAME_TAKEN
+          reason: A tag with this name already exists in this workspace.
+    Errors.TagNotFound:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      examples:
+        - code: TAG_NOT_FOUND
+          reason: The specified tag does not exist.
+    Errors.UserAlreadyInWorkspace:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Errors.Error'
+      examples:
+        - code: ALREADY_IN_WORKSPACE
+          reason: This user has already been invited to this workspace.
+    Models.Activities:
+      type: object
+      required:
+        - activities
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Models.Activity'
+    Models.Activity:
+      type: object
+      required:
+        - id
+        - workspaceID
+        - description
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        workspaceID:
+          type: string
+          format: uuid
+        userID:
+          type: string
+          format: uuid
+        boardID:
+          type: string
+          format: uuid
+        columnID:
+          type: string
+          format: uuid
+        cardID:
+          type: string
+          format: uuid
+        commentID:
+          type: string
+          format: uuid
+        tagID:
+          type: string
+          format: uuid
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: ISO8601
+    Models.Board:
+      type: object
+      required:
+        - id
+        - title
+        - prefix
+        - sequence
+        - isArchived
+        - workspaceID
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        prefix:
+          type: string
+          minLength: 3
+        sequence:
+          type: integer
+        isArchived:
+          type: boolean
+        workspaceID:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: ISO8601
+        updatedAt:
+          type: string
+          format: ISO8601
+      examples:
+        - id: 66aa8d52-28a5-4fae-b679-6a9437f47071
+          title: Chores
+          description: Things to complete around the swamp.
+          prefix: CHORE
+          sequence: 10
+          isArchived: false
+          workspaceID: 39ce96b4-e57e-42d5-aad9-c566db0cb0db
+          createdAt: '2026-03-20T15:36:50.714Z'
+          updatedAt: '2026-03-20T15:36:50.714Z'
+    Models.BoardCreation:
+      type: object
+      required:
+        - title
+        - prefix
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        prefix:
+          type: string
+          minLength: 3
+      examples:
+        - title: Chores
+          description: Things to complete around the swamp.
+          prefix: CHORE
+    Models.BoardUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        isArchived:
+          type: boolean
+      examples:
+        - title: Chores Updated
+          description: Updated things to complete around the swamp.
+          isArchived: false
+    Models.Boards:
+      type: object
+      required:
+        - boards
+      properties:
+        boards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Models.Board'
+    Models.Card:
+      type: object
+      required:
+        - id
+        - title
+        - isArchived
+        - position
+        - boardID
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          format: markdown
+        isArchived:
+          type: boolean
+        position:
+          type: number
+        boardID:
+          type: string
+          format: uuid
+        columnID:
+          type: string
+          format: uuid
+        userID:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: ISO8601
+        updatedAt:
+          type: string
+          format: ISO8601
+      examples:
+        - id: 2cf0b66b-f439-4b3b-8662-c58580fb9261
+          title: Clean Mud Puddle
+          isArchived: false
+          position: 1.5
+          boardID: 66aa8d52-28a5-4fae-b679-6a9437f47071
+          columnID: eddde334-5cad-4c91-9a57-2de4cbbc1a20
+          userID: a922dd49-d4d0-4a00-a84c-42c00dbe8821
+          createdAt: '2026-03-20T15:36:50.714Z'
+          updatedAt: '2026-03-20T15:36:50.714Z'
+    Models.CardCreation:
+      type: object
+      required:
+        - title
+        - position
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          format: markdown
+        position:
+          type: number
+        columnID:
+          type: string
+          format: uuid
+        userID:
+          type: string
+          format: uuid
+        tagIDs:
+          type: array
+          items:
+            type: string
+          description: IDs of tags to attach to the card on creation.
+      examples:
+        - title: Clean Mud Puddle
+          description: Make sure to scrub the edges.
+          position: 1
+          columnID: eddde334-5cad-4c91-9a57-2de4cbbc1a20
+          userID: a922dd49-d4d0-4a00-a84c-42c00dbe8821
+          tagIDs:
+            - 12891d55-3df6-4f16-991f-efb76ecc4ef2
+    Models.CardUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          format: markdown
+        isArchived:
+          type: boolean
+        position:
+          type: number
+        columnID:
+          type: string
+          format: uuid
+        userID:
+          type: string
+          format: uuid
+      examples:
+        - title: Scrub Mud Puddle
+          description: Use the big brush.
+          isArchived: false
+          position: 1.5
+          columnID: eddde334-5cad-4c91-9a57-2de4cbbc1a20
+          userID: a922dd49-d4d0-4a00-a84c-42c00dbe8821
+    Models.CardWithTags:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Models.Tag'
+      allOf:
+        - $ref: '#/components/schemas/Models.Card'
+    Models.Cards:
+      type: object
+      required:
+        - cards
+      properties:
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Models.CardWithTags'
+    Models.Column:
+      type: object
+      required:
+        - id
+        - title
+        - isTerminal
+        - position
+        - boardID
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        limit:
+          type: integer
+        color:
+          type: string
+          pattern: ^#[0-9a-f]{6}$
+          format: hex color
+        isTerminal:
+          type: boolean
+          description: If cards in this column are quickly archiveable
+        position:
+          type: integer
+        boardID:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: ISO8601
+        updatedAt:
+          type: string
+          format: ISO8601
+      examples:
+        - id: eddde334-5cad-4c91-9a57-2de4cbbc1a20
+          title: Completed
+          color: '#8DFF6E'
+          isTerminal: true
+          position: 4
+          boardID: 66aa8d52-28a5-4fae-b679-6a9437f47071
+          createdAt: '2026-03-20T15:36:50.714Z'
+          updatedAt: '2026-03-20T15:36:50.714Z'
+    Models.ColumnCreation:
+      type: object
+      required:
+        - title
+        - isTerminal
+        - position
+      properties:
+        title:
+          type: string
+        limit:
+          type: integer
+        color:
+          type: string
+          pattern: ^#[0-9a-f]{6}$
+          format: hex color
+        isTerminal:
+          type: boolean
+          description: If cards in this column are quickly archiveable
+        position:
+          type: integer
+      examples:
+        - title: In Progress
+          color: '#ffd700'
+          isTerminal: false
+          position: 2
+    Models.ColumnUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        limit:
+          type: integer
+        color:
+          type: string
+          pattern: ^#[0-9a-f]{6}$
+          format: hex color
+        isTerminal:
+          type: boolean
+          description: If cards in this column are quickly archiveable
+        position:
+          type: integer
+      examples:
+        - title: Done
+          color: '#8DFF6E'
+          isTerminal: true
+          position: 3
+    Models.ColumnWithCards:
+      type: object
+      properties:
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Models.Card'
+      allOf:
+        - $ref: '#/components/schemas/Models.Column'
+    Models.Columns:
+      type: object
+      required:
+        - columns
+      properties:
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/Models.ColumnWithCards'
+    Models.Comment:
+      type: object
+      required:
+        - id
+        - body
+        - cardID
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        body:
+          type: string
+          format: markdown
+        cardID:
+          type: string
+          format: uuid
+        userID:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: ISO8601
+        updatedAt:
+          type: string
+          format: ISO8601
+      examples:
+        - id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+          body: Don't forget to rinse after scrubbing.
+          cardID: 2cf0b66b-f439-4b3b-8662-c58580fb9261
+          userID: a922dd49-d4d0-4a00-a84c-42c00dbe8821
+          createdAt: '2026-03-20T15:36:50.714Z'
+          updatedAt: '2026-03-20T15:36:50.714Z'
+    Models.CommentCreation:
+      type: object
+      required:
+        - body
+      properties:
+        body:
+          type: string
+          format: markdown
+      examples:
+        - body: Don't forget to rinse after scrubbing.
+    Models.CommentUpdate:
+      type: object
+      required:
+        - body
+      properties:
+        body:
+          type: string
+          format: markdown
+      examples:
+        - body: Also scrub the edges thoroughly.
+    Models.Comments:
+      type: object
+      required:
+        - comments
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Models.Comment'
+    Models.Members:
+      type: object
+      required:
+        - members
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/Models.UserRole'
+    Models.Membership:
+      type: object
+      required:
+        - userID
+        - role
+      properties:
+        userID:
+          type: string
+          format: uuid
+        role:
+          $ref: '#/components/schemas/Models.Role'
+    Models.MembershipUpdate:
+      type: object
+      required:
+        - role
+      properties:
+        role:
+          $ref: '#/components/schemas/Models.Role'
+    Models.Registration:
+      type: object
+      required:
+        - email
+        - name
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          minLength: 2
+          pattern: ^[a-zA-Z0-9]+$
+        password:
+          type: string
+          minLength: 8
+          pattern: ^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&\^])[A-Za-z\d@$!%*?&\^]{8,}
+      examples:
+        - email: shrek@myswamp.com
+          name: Shrek
+          password: OnionsAreRockstars1!
+    Models.Role:
+      type: string
+      enum:
+        - owner
+        - admin
+        - contributer
+        - viewer
+    Models.Tag:
+      type: object
+      required:
+        - id
+        - name
+        - workspaceID
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        color:
+          type: string
+          pattern: ^#[0-9a-f]{6}$
+          format: hex color
+        workspaceID:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: ISO8601
+        updatedAt:
+          type: string
+          format: ISO8601
+      examples:
+        - id: 12891d55-3df6-4f16-991f-efb76ecc4ef2
+          name: Cleaning
+          color: '#4899FF'
+          workspaceID: 39ce96b4-e57e-42d5-aad9-c566db0cb0db
+          createdAt: '2026-03-20T15:36:50.714Z'
+          updatedAt: '2026-03-20T15:36:50.714Z'
+    Models.TagCreation:
+      type: object
+      required:
+        - name
+        - color
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+          pattern: ^#[0-9a-f]{6}$
+          format: hex color
+      examples:
+        - name: Cleaning
+          color: '#4899FF'
+    Models.TagUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+          pattern: ^#[0-9a-f]{6}$
+          format: hex color
+      examples:
+        - name: Deep Cleaning
+          color: '#FF4848'
+    Models.Tags:
+      type: object
+      required:
+        - tags
+      properties:
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Models.Tag'
+    Models.UpdatePassword:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+          pattern: ^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&\^])[A-Za-z\d@$!%*?&\^]{8,}
+      examples:
+        - currentPassword: OnionsAreLikeRockstars1!
+          newPassword: OgresAreLikeOnions$2
+    Models.User:
+      type: object
+      required:
+        - id
+        - email
+        - name
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: ISO8601
+      examples:
+        - id: a922dd49-d4d0-4a00-a84c-42c00dbe8821
+          email: shrek@myswamp.com
+          name: Shrek
+          createdAt: '2026-03-20T15:36:50.714Z'
+    Models.UserRole:
+      type: object
+      required:
+        - role
+      properties:
+        role:
+          $ref: '#/components/schemas/Models.Role'
+      allOf:
+        - $ref: '#/components/schemas/Models.User'
+    Models.UserToken:
+      type: object
+      required:
+        - token
+        - user
+      properties:
+        token:
+          type: string
+          format: JWT
+        user:
+          $ref: '#/components/schemas/Models.User'
+      examples:
+        - token: eyJhbGciOi...QV30
+          user:
+            id: a922dd49-d4d0-4a00-a84c-42c00dbe8821
+            email: shrek@myswamp.com
+            name: Shrek
+            createdAt: '2026-03-20T15:36:50.714Z'
+    Models.Workspace:
+      type: object
+      required:
+        - id
+        - title
+        - ownerID
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        ownerID:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: ISO8601
+        updatedAt:
+          type: string
+          format: ISO8601
+      examples:
+        - id: 39ce96b4-e57e-42d5-aad9-c566db0cb0db
+          title: My Swamp
+          ownerID: a922dd49-d4d0-4a00-a84c-42c00dbe8821
+          createdAt: '2026-03-20T15:36:50.714Z'
+          updatedAt: '2026-03-20T15:36:50.714Z'
+    Models.WorkspaceCreation:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+      examples:
+        - title: My Swamp
+          description: 123 Ogre Lane
+    Models.Workspaces:
+      type: object
+      required:
+        - workspaces
+      properties:
+        workspaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/Models.Workspace'
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: Basic
+    BearerAuth:
+      type: http
+      scheme: Bearer
