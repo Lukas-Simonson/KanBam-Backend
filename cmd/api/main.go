@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"getkanbam.app/api/internal/db"
 	"getkanbam.app/api/internal/handler"
@@ -13,6 +14,9 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
@@ -39,6 +43,18 @@ func main() {
 
 	if err := pool.Ping(context.Background()); err != nil {
 		log.Fatalf("db ping: %v", err)
+	}
+
+	migrateURL := strings.NewReplacer(
+		"postgresql://", "pgx5://",
+		"postgres://", "pgx5://",
+	).Replace(cfg.DatabaseURL)
+	m, err := migrate.New("file://migrations", migrateURL)
+	if err != nil {
+		log.Fatalf("migrations init: %v", err)
+	}
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatalf("migrations up: %v", err)
 	}
 
 	queries := db.New(pool)
