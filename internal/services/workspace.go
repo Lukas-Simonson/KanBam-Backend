@@ -71,6 +71,13 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID string, r
 	if err != nil {
 		return model.Workspace{}, fmt.Errorf("creating workspace: %w", err)
 	}
+	if err := s.db.AddWorkspaceMember(ctx, db.AddWorkspaceMemberParams{
+		UserID:      ownerID,
+		WorkspaceID: w.ID,
+		Role:        db.RoleOwner,
+	}); err != nil {
+		return model.Workspace{}, fmt.Errorf("adding owner membership: %w", err)
+	}
 	return workspaceToModel(w), nil
 }
 
