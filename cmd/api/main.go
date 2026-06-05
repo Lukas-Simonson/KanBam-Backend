@@ -88,14 +88,15 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// Auth (no JWT required except updatePassword)
-	r.Post("/auth/register", authHandler.Register)
-	r.Post("/auth/login", authHandler.Login)
-	r.With(midd.JWTBearerMiddleware(cfg.JWTSecret)).Post("/auth/updatePassword", authHandler.UpdatePassword)
+	r.Route("/api/v1", func(r chi.Router) {
+		// Auth (no JWT required except updatePassword)
+		r.Post("/auth/register", authHandler.Register)
+		r.Post("/auth/login", authHandler.Login)
+		r.With(midd.JWTBearerMiddleware(cfg.JWTSecret)).Post("/auth/updatePassword", authHandler.UpdatePassword)
 
-	// All routes below require JWT
-	r.Group(func(r chi.Router) {
-		r.Use(midd.JWTBearerMiddleware(cfg.JWTSecret))
+		// All routes below require JWT
+		r.Group(func(r chi.Router) {
+			r.Use(midd.JWTBearerMiddleware(cfg.JWTSecret))
 
 		// Workspaces
 		r.Get("/workspaces", workspaceHandler.List)
@@ -167,7 +168,8 @@ func main() {
 
 		// Activity (direct access)
 		r.Get("/activity/{activityID}", activityHandler.Get)
-	})
+		}) // end JWT group
+	}) // end /api/v1
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("listening on %s", addr)

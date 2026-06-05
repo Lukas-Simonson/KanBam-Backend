@@ -2,7 +2,7 @@ package model
 
 type Registration struct {
 	Email    string `json:"email" validate:"required,email"`
-	Name     string `json:"name" validate:"required,min=2,alphanum"`
+	Name     string `json:"name" validate:"required,min=2"`
 	Password string `json:"password" validate:"required,min=8,password_complexity"`
 }
 
